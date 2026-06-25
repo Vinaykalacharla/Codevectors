@@ -1,0 +1,13 @@
+{
+  "name": "codevector-root",
+  "private": true,
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "install:backend": "npm --prefix backend install",
+    "start": "node backend/server.js",
+    "seed": "node backend/seed.js",
+    "add-50": "node backend/add_50.js"
+  }
+}
