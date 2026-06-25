@@ -1,50 +1,106 @@
-# CodeVector Backend Assignment
+# CodeVector
 
-This repository contains the backend implementation for the CodeVector ~200,000 product pagination assignment.
+CodeVector is a full-stack product browsing demo built to solve a common pagination problem in real-world applications: keeping results stable even when new records are inserted during browsing.
 
-## Architecture & Technical Decisions
+The project uses cursor-based pagination with PostgreSQL, along with a lightweight frontend to visualize the behavior in real time.
 
-### 1. The Concurrency Problem & Keyset Pagination
-The prompt explicitly required: *"If 50 new products are added/updated while someone is browsing, they must not see the same product twice or miss one."*
+## Overview
 
-Standard `OFFSET X LIMIT Y` pagination completely fails this requirement. If you are on Page 1 (items 1-50) and 50 new items are inserted, all original items are pushed to positions 51-100. When fetching Page 2 (`OFFSET 50`), the user will see the exact same items they just saw.
+This application demonstrates how to paginate large datasets without the common issues caused by offset-based pagination. When new products are added while a user is browsing, cursor-based pagination ensures that the user does not see duplicate items or skip products unexpectedly.
 
-**Solution:** I implemented strict **Cursor-based (Keyset) Pagination**. By using the tuple `(created_at, id)`, the database queries for items *older* than the last seen item. This locks the pagination to the data itself, completely immunizing the feed against concurrent insertions. 
+## Key Features
 
-### 2. Performance & High-Speed Seeding
-- **Database Indexing:** Added a composite index on `(category, created_at DESC, id DESC)` to guarantee `O(1)` query speeds regardless of how deep the user paginates.
-- **Seeding Script (`seed.js`):** The assignment requested not to use a slow loop. The seed script chunks the 200,000 rows into massive batch inserts (5,000 rows per query), reducing network round-trips and populating the database in seconds.
-- **Raw SQL:** Built using the `pg` driver to maintain absolute control over the complex tuple-comparison logic and minimize overhead, avoiding bloated ORMs.
+- Stable, cursor-based pagination for large product lists
+- High-performance seeding of 200,000 sample products
+- Live insertion of new products to test pagination behavior
+- REST API endpoints for product, category, and count data
+- Simple frontend interface for visual testing
+
+## Tech Stack
+
+- Node.js
+- Express.js
+- PostgreSQL
+- pg (Node PostgreSQL driver)
+- dotenv
+- Vanilla JavaScript and HTML/CSS
 
 ## Project Structure
-- `backend/server.js`: The Express.js backend containing the pagination logic.
-- `backend/db.js`: PostgreSQL connection pool setup.
-- `backend/seed.js`: The high-performance data generation script.
-- `backend/add_50.js`: A simple utility to inject 50 new products to live-test the concurrency requirements.
-- `frontend/index.html`: A vanilla JS/CSS frontend to visually verify the backend pagination.
 
-## How to Run Locally
+- [backend/server.js](backend/server.js) — Express server and pagination API
+- [backend/db.js](backend/db.js) — PostgreSQL connection pool setup
+- [backend/seed.js](backend/seed.js) — Script to generate and seed 200,000 sample products
+- [backend/add_50.js](backend/add_50.js) — Adds 50 new products to test live pagination behavior
+- [frontend/index.html](frontend/index.html) — Frontend UI for browsing products
 
-1. Create a PostgreSQL database (e.g., Neon DB, Supabase).
-2. Inside the `backend` directory, copy `.env.example` to `.env` and provide your `DATABASE_URL`.
-3. Install dependencies:
+## Prerequisites
+
+Before running the project, make sure you have:
+
+- Node.js installed
+- A PostgreSQL database available
+- A valid database connection URL
+
+## Setup
+
+1. Clone the repository and navigate to the project folder.
+2. Install dependencies:
+
    ```bash
-   cd backend
    npm install
    ```
-4. Seed the database (Generates 200k rows instantly):
-   ```bash
-   node seed.js
-   ```
-5. Start the server:
-   ```bash
-   node server.js
-   ```
-6. Open `http://localhost:3000` in your browser.
 
-## Testing Concurrency
-To prove the cursor pagination handles live data correctly:
-1. Open the UI and navigate to Page 3.
-2. In a separate terminal, navigate to the `backend` folder and run `node add_50.js`.
-3. Click "Next Page" or "Previous Page" in the UI. Notice that no items shift or duplicate.
-4. Navigate back to Page 1, and the new item will flawlessly appear at the top.
+3. Configure your environment variables in [backend/.env](backend/.env) by setting a valid `DATABASE_URL`.
+
+## Run the Project
+
+From the project root, use the following commands:
+
+### Start the backend server
+
+```bash
+npm run start
+```
+
+### Seed the database with sample products
+
+```bash
+npm run seed
+```
+
+### Insert 50 new products to test live updates
+
+```bash
+npm run add-50
+```
+
+Once the server is running, open:
+
+```text
+http://localhost:3000
+```
+
+## API Endpoints
+
+- `GET /api/products` — returns paginated products
+- `GET /api/products/count` — returns total product count
+- `GET /api/categories` — returns available categories
+
+You can pass query parameters such as `limit`, `cursor`, and `category` to the products endpoint.
+
+## Why Cursor Pagination?
+
+Offset-based pagination can break when new rows are inserted between requests. Cursor-based pagination avoids this by ordering records using a stable key tuple such as `(created_at, id)` and fetching items after the last seen row.
+
+## Testing the Concurrency Behavior
+
+To observe the pagination behavior in action:
+
+1. Open the app in the browser.
+2. Navigate to a later page.
+3. In another terminal, run `npm run add-50`.
+4. Continue browsing and notice that products remain consistent without duplicates or missing entries.
+
+## Notes
+
+The project is designed to work with services such as Supabase, Neon, or any other PostgreSQL provider that supports SSL connections.
